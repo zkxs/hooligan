@@ -1,46 +1,70 @@
 # Hooligan
 
-Hooligan is a utility that manages VRChat's
-[LocalPlayerModerations files](https://docs.vrchat.com/docs/local-vrchat-storage#localplayermoderations-file-format).
-These files have a .vrcset extension and contain data on players for whom you've manually shown or hidden their avatar.
+Hooligan is a utility that resets manually shown avatars in VRChat before each play session.
 
-# Features
+## Installation and Usage
 
-- Automatically clear shown avatars
-- Users can be whitelisted to exempt them from the auto-clear
-- Tracks the number of times you've shown someone's avatar
-- Users who have been shown a certain number of times can be exempted from the auto-clear
+1. Download hooligan.exe from the [latest release](https://github.com/zkxs/hooligan/releases/latest) to a location of
+   your choice. Make note of where you saved it.
+2. In Steam, change the VRChat launch option to `<INSTALL_LOCATION>\hooligan.exe %command%`, where `<INSTALL_LOCATION>`
+   is where you saved hooligan.exe. For example, if you saved it to `C:\Users\Tupper\Downloads\` then you should use
+   `C:\Users\Tupper\Downloads\hooligan.exe %command%` as the Steam launch option.
 
-# TODO
+Hooligan will now automatically run as you start VRChat.
 
-- Automatically runs before starting VRChat
-- Config management UI
+## FAQ
 
-# Usage
+### Why make Hooligan?
 
-<!-- TODO -->
+I personally use very aggressive performance rank settings to save my FPS, so find it annoying when I manually show
+someone's avatar and then a year later I run into them again in the least optimized avatar I've ever seen. Hooligan
+solves this problem by making all manually shown avatars temporary to a single play session.
 
-# FAQ
+### What does Hooligan do?
 
-## Why is this called Hooligan?
+It just edits your 
+[LocalPlayerModerations file](https://docs.vrchat.com/docs/local-vrchat-storage#localplayermoderations-file-format) to
+remove all shown avatar entries. This file has a .vrcset extension and contain data on players for whom you've manually
+shown or hidden their avatar.
+
+### What's up with the weird Steam launch option?
+
+When you pass `%command%` the Steam launch options for a game, it does NOT run the game command. It instead executes the entire launch options as
+a command, and the actual game launch command is substituted in where `%command%` is.
+
+So `C:\hooligan.exe %command%` will become `C:\hooligan.exe C:\Steam\steamapps\common\VRChat\launch.exe`, or in desktop mode `C:\hooligan.exe C:\Steam\steamapps\common\VRChat\launch.exe --no-vr`
+
+After Hooligan cleans up your LocalPlayerModerations file it will take those launch options and run them to start VRChat.
+
+Note that you can still use Hooligan without this process launching behavior simply by not passing any arguments to it.
+
+### Why is this called Hooligan?
 
 VRChat Local Player Moderation Manager is too long, and this is used to unshow hooligans' avatars before they change
 into something with terrible performance while you're not playing. Also, I like the word "hooligan".
 
-## Why does my antivirus hate this?
+### Why does my antivirus hate Hooligan?
 
-- I'm not paying upwards of 50 USD per year for a code signing cert, and antivirus software dislikes unsigned code.
+- Antivirus software dislikes unsigned code, and I'm not paying upwards of 50 USD per year for a code signing cert.
 - I'm _definitely_ not paying upwards of 250 USD per year for a more trusted EV (extended validation) code signing cert.
 - Some antivirus software conflates a lack of C-style struct and function definitions with obfuscation. Spoiler alert:
   this application isn't written in C.
 - It's not my job to fix antivirus false positives. I'm not going to spend my time begging various antivirus vendors to
   fix their shit.
 
-## What's up with the Steam launch option thing?
+## Installing from Source
 
-When you pass `%command%` the Steam launch options for a game, it does NOT run the game command. It instead executes the entire launch options as
-a command, and the actual game launch command is substituted in where `%command%` is. 
+1. [Install Rust](https://www.rust-lang.org/tools/install)
+2. `cargo install hooligan`
 
-So `C:\hooligan.exe %command%` will become `C:\hooligan.exe C:\Steam\steamapps\common\VRChat\launch.exe`, or in desktop mode `C:\hooligan.exe C:\Steam\steamapps\common\VRChat\launch.exe --no-vr`
+## Building from Source
 
-After Hooligan cleans up your LocalPlayerModerations file it will take those launch options and run them to start VRChat.
+1. [Install Rust](https://www.rust-lang.org/tools/install)
+2. Clone the project
+3. `cargo build --release`
+
+## License
+
+Copyright 2024
+
+Hooligan is provided under the [GPL-3.0 license](LICENSE).

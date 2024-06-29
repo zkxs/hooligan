@@ -1,3 +1,7 @@
+// This file is part of hooligan and is licenced under the GNU GPL v3.0.
+// See LICENSE file for full text.
+// Copyright © 2024 Michael Ripley
+
 //! Serialization and deserialization logic for the LocalPlayerModerations file format
 
 const HIDE_AVATAR_VALUE: &str = "004";
