@@ -24,7 +24,7 @@ solves this problem by making all manually shown avatars temporary to a single p
 
 It just edits your 
 [LocalPlayerModerations file](https://docs.vrchat.com/docs/local-vrchat-storage#localplayermoderations-file-format) to
-remove all shown avatar entries. This file has a .vrcset extension and contain data on players for whom you've manually
+remove all shown avatar entries. This file has a .vrcset extension and contains data on players for whom you've manually
 shown or hidden their avatar.
 
 ### What's up with the weird Steam launch option?
