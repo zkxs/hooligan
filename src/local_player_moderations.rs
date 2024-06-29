@@ -16,7 +16,7 @@ pub struct Line {
 }
 
 impl Line {
-    pub fn parse(line: &str) -> Result<Line, ParseError> {
+    pub fn parse(line: &str) -> Result<Self, ParseError> {
         let mut split = line.split(' ').filter(|s| !s.is_empty());
         let key = split.next().ok_or_else(|| ParseError::BadSplit(line.to_owned()))?;
         let value = split.next().ok_or_else(|| ParseError::BadSplit(line.to_owned()))?;
@@ -29,7 +29,7 @@ impl Line {
         let value: Value = Value::parse(value)?;
         let key = key.to_owned();
 
-        Ok(Line {
+        Ok(Self {
             key,
             value,
         })
@@ -48,18 +48,18 @@ pub enum Value {
 
 impl Value {
     /// `value` is an integer in the range \[000,999]
-    fn parse(value: &str) -> Result<Value, ParseError> {
+    fn parse(value: &str) -> Result<Self, ParseError> {
         match value {
-            HIDE_AVATAR_VALUE => Ok(Value::Hide),
-            SHOW_AVATAR_VALUE => Ok(Value::Show),
+            HIDE_AVATAR_VALUE => Ok(Self::Hide),
+            SHOW_AVATAR_VALUE => Ok(Self::Show),
             unknown_value => Err(ParseError::UnknownValue(unknown_value.to_owned())),
         }
     }
 
-    fn serialize(&self) -> &str {
+    const fn serialize(&self) -> &str {
         match self {
-            Value::Hide => HIDE_AVATAR_VALUE,
-            Value::Show => SHOW_AVATAR_VALUE,
+            Self::Hide => HIDE_AVATAR_VALUE,
+            Self::Show => SHOW_AVATAR_VALUE,
         }
     }
 }
