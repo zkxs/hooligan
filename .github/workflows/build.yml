@@ -78,20 +78,13 @@ jobs:
           profile: minimal
           toolchain: stable
           target: ${{ matrix.target.triple }}
-      - name: Setup Rust nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          components: rust-src
-          target: ${{ matrix.target.triple }}
       - name: Check
         run: cargo check --target ${{ matrix.target.triple }}
       - name: Test
         if: matrix.target.runner-can-execute
         run: cargo test --target ${{ matrix.target.triple }}
       - name: Build
-        run: cargo +nightly build -Z build-std=std --release --target ${{ matrix.target.triple }}
+        run: cargo build --release --target ${{ matrix.target.triple }}
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
