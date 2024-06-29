@@ -9,6 +9,7 @@ use std::fmt::{Display, Formatter};
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::time::SystemTime;
+
 use directories::ProjectDirs;
 use file_rotate::{ContentLimit, FileRotate};
 use file_rotate::suffix::AppendCount;
@@ -24,6 +25,7 @@ impl LogFile {
         Self { write }
     }
 
+    /// evil hack to write timestamps in logs
     pub fn write_fmt(&mut self, args: fmt::Arguments<'_>) {
         write!(self.write, "{}: ", CurrentTime).expect("failed to write log timestamp");
         self.write.write_fmt(args).expect("failed to write log arguments");
@@ -68,7 +70,7 @@ fn get_log_dir() -> io::Result<PathBuf> {
 struct CurrentTime;
 
 impl Display for CurrentTime {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match SystemTime::UNIX_EPOCH.elapsed() {
             Ok(current_time) => write!(f, "{}", current_time.as_secs()),
             Err(e) => write!(f, "-{}", e.duration().as_secs())

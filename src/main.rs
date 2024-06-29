@@ -9,6 +9,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
 use crate::local_player_moderations as lpmod;
 
 mod local_player_moderations;
@@ -63,8 +64,8 @@ impl Hooligan {
                             }
                             !remove
                         });
-                    write_lines(path, lines)?;
-                    writeln!(self.log, "removed {} shown avatar entries", removed);
+                    write_lines(path.as_path(), lines)?;
+                    writeln!(self.log, "removed {} shown avatar entries from {}", removed, path.file_name().unwrap().to_string_lossy());
                 }
             }
         }
@@ -75,6 +76,7 @@ impl Hooligan {
             // we got args, blindly run them as a command
             let mut command = Command::new(command);
             command.args(args);
+            writeln!(self.log, "spawning {command:?}");
             let _ = command.spawn().map_err(Error::Io)?;
         }
 
