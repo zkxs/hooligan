@@ -43,15 +43,6 @@ Note that you can still use Hooligan without this process launching behavior sim
 VRChat Local Player Moderation Manager is too long, and this is used to unshow hooligans' avatars before they change
 into something with terrible performance while you're not playing. Also, I like the word "hooligan".
 
-### Why does my antivirus hate Hooligan?
-
-- Antivirus software dislikes unsigned code, and I'm not paying upwards of 50 USD per year for a code signing cert.
-- I'm _definitely_ not paying upwards of 250 USD per year for a more trusted EV (extended validation) code signing cert.
-- Some antivirus software conflates a lack of C-style struct and function definitions with obfuscation. Spoiler alert:
-  this application isn't written in C.
-- It's not my job to fix antivirus false positives. I'm not going to spend my time begging various antivirus vendors to
-  fix their shit.
-
 ## Installing from Source
 
 1. [Install Rust](https://www.rust-lang.org/tools/install)
