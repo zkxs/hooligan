@@ -16,6 +16,13 @@ pub struct Line {
 }
 
 impl Line {
+    pub const fn new(key: String, value: Value) -> Self {
+        Self {
+            key,
+            value,
+        }
+    }
+    
     pub fn parse(line: &str) -> Result<Self, ParseError> {
         let mut split = line.split(' ').filter(|s| !s.is_empty());
         let key = split.next().ok_or_else(|| ParseError::BadSplit(line.to_owned()))?;

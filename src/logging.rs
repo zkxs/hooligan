@@ -36,34 +36,29 @@ impl LogFile {
     }
 }
 
-pub fn get_logger() -> io::Result<LogFile> {
+pub fn get_logger(project_dirs: &ProjectDirs) -> io::Result<LogFile> {
     let file_rotate = FileRotate::new(
-        get_log_file_prefix()?,
+        get_log_file_prefix(project_dirs)?,
         AppendCount::new(3),
         ContentLimit::BytesSurpassed(1024 * 1024 * 10),
     );
     Ok(LogFile::new(BufWriter::new(file_rotate)))
 }
 
-fn get_log_file_prefix() -> io::Result<PathBuf> {
-    let mut log_file_prefix_path = create_log_dir_path()?;
+fn get_log_file_prefix(project_dirs: &ProjectDirs) -> io::Result<PathBuf> {
+    let mut log_file_prefix_path = create_log_dir_path(project_dirs)?;
     log_file_prefix_path.push("hooligan.log");
     Ok(log_file_prefix_path)
 }
 
-fn create_log_dir_path() -> io::Result<PathBuf> {
-    let log_dir_path: PathBuf = get_log_dir()?;
+fn create_log_dir_path(project_dirs: &ProjectDirs) -> io::Result<PathBuf> {
+    let log_dir_path: PathBuf = get_log_dir(project_dirs);
     fs::create_dir_all(log_dir_path.as_path())?;
     Ok(log_dir_path)
 }
 
-fn get_log_dir() -> io::Result<PathBuf> {
-    Ok(
-        ProjectDirs::from("zkxs.dev", "", "hooligan")
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "failed to find valid project directory"))?
-            .data_local_dir()
-            .join("logs")
-    )
+fn get_log_dir(project_dirs: &ProjectDirs) -> PathBuf {
+    project_dirs.data_local_dir().join("logs")
 }
 
 /// Handles displaying the current time in a minimally expensive way
