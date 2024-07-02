@@ -6,7 +6,7 @@ authors = ["Michael Ripley <zkxs00@gmail.com"]
 license = "GPL-3.0-only"
 description = "Manages VRChat LocalPlayerModerations file"
 readme = "README.md"
-homepage = "https://github.com/zkxs/hooligan"
+repository = "https://github.com/zkxs/hooligan"
 keywords = ["vrchat"]
 categories = []
 
