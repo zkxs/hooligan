@@ -7,8 +7,6 @@ license = "GPL-3.0-only"
 description = "Manages VRChat LocalPlayerModerations file"
 readme = "README.md"
 homepage = "https://github.com/zkxs/hooligan"
-repository = "https://github.com/zkxs/hooligan"
-documentation = "https://github.com/zkxs/hooligan"
 keywords = ["vrchat"]
 categories = []
 
