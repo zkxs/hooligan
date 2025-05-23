@@ -17,4 +17,3 @@ strip = true
 
 [dependencies]
 directories = "5"
-file-rotate = {git = "https://github.com/zkxs/file-rotate.git", branch = "time-and-compression-features", default-features = false}

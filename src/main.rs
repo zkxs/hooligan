@@ -46,7 +46,7 @@ enum Error {
 }
 
 struct Hooligan {
-    log: logging::LogFile,
+    log: logging::LogWriter,
     project_dirs: ProjectDirs,
 }
 
