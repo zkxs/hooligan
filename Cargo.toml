@@ -16,4 +16,4 @@ codegen-units = 1
 strip = true
 
 [dependencies]
-directories = "5"
+directories = "6"

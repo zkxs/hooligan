@@ -95,7 +95,7 @@ allow = [
     "MIT",
     # Weirder stuff
     "MPL-2.0", # OSI and FSF approved. Needed by option-ext
-    "Unicode-DFS-2016", # OSI but not FSF approved. Needed by unicode-ident.
+    "Unicode-3.0", # OSI but not FSF approved. Needed by unicode-ident.
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the
