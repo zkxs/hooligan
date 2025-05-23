@@ -22,7 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v1
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          rust-version: "1.87.0"
   cargo-fmt:
     runs-on: ubuntu-latest
     steps:
@@ -71,6 +73,12 @@ jobs:
     name: Test ${{ matrix.target.build-name }}
     runs-on: ${{ matrix.target.runs-on }}
     steps:
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target.triple }}
+      - name: Install Cargo
+        run: rustup component add cargo
+      - name: Install Clippy
+        run: rustup component add clippy
       - name: git checkout
         uses: actions/checkout@v4
       - name: Setup workflow cache
@@ -84,7 +92,7 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Check
-        run: cargo check --target ${{ matrix.target.triple }}
+        run: cargo clippy --target ${{ matrix.target.triple }}
       - name: Test
         if: matrix.target.runner-can-execute
         run: cargo test --target ${{ matrix.target.triple }}
