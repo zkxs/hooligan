@@ -17,12 +17,9 @@ pub struct Line {
 
 impl Line {
     pub const fn new(key: String, value: Value) -> Self {
-        Self {
-            key,
-            value,
-        }
+        Self { key, value }
     }
-    
+
     pub fn parse(line: &str) -> Result<Self, ParseError> {
         let mut split = line.split(' ').filter(|s| !s.is_empty());
         let key = split.next().ok_or_else(|| ParseError::BadSplit(line.to_owned()))?;
@@ -36,10 +33,7 @@ impl Line {
         let value: Value = Value::parse(value)?;
         let key = key.to_owned();
 
-        Ok(Self {
-            key,
-            value,
-        })
+        Ok(Self { key, value })
     }
 
     pub fn serialize(&self) -> String {
@@ -127,8 +121,10 @@ mod tests {
 
     #[test]
     fn test_line_bad_split_too_many() {
-        let actual = Line::parse("2ZaOGztkpc                                                      foo bar").unwrap_err();
-        let expected = ParseError::BadSplit("2ZaOGztkpc                                                      foo bar".to_string());
+        let actual =
+            Line::parse("2ZaOGztkpc                                                      foo bar").unwrap_err();
+        let expected =
+            ParseError::BadSplit("2ZaOGztkpc                                                      foo bar".to_string());
         assert_eq!(actual, expected);
     }
 }

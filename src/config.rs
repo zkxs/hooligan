@@ -16,9 +16,7 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self {
-            auto_hide_threshold: 3,
-        }
+        Self { auto_hide_threshold: 3 }
     }
 }
 
@@ -35,9 +33,7 @@ impl Config {
     }
 
     const fn new() -> Self {
-        Self {
-            auto_hide_threshold: 0,
-        }
+        Self { auto_hide_threshold: 0 }
     }
 
     fn parse_line(&mut self, line: &str) -> Result<(), Error> {

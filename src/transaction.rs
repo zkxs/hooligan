@@ -23,20 +23,16 @@ pub struct Transaction {
 
 impl Transaction {
     pub const fn new(key: String, value: Value) -> Self {
-        Self {
-            key,
-            value,
-        }
+        Self { key, value }
     }
 
     pub fn parse(value: &str) -> Result<Self, ParseError> {
-        let (key, value) = value.split_once(' ').ok_or_else(|| ParseError::BadSplit(value.to_owned()))?;
+        let (key, value) = value
+            .split_once(' ')
+            .ok_or_else(|| ParseError::BadSplit(value.to_owned()))?;
         let key = key.to_owned();
         let value = Value::parse(value)?;
-        Ok(Self {
-            key,
-            value,
-        })
+        Ok(Self { key, value })
     }
 
     pub fn serialize(&self) -> String {
@@ -95,10 +91,7 @@ enum ShowHideState {
 
 impl ShowHideCount {
     const fn new(count: u32, state: ShowHideState) -> Self {
-        Self {
-            count,
-            state,
-        }
+        Self { count, state }
     }
 
     fn reset(&mut self, state: ShowHideState) {

@@ -4,12 +4,12 @@
 
 //! Logging-related utilities
 
-use std::{fmt, fs, io};
 use std::fmt::{Display, Formatter};
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::time::SystemTime;
+use std::{fmt, fs, io};
 
 use directories::ProjectDirs;
 
@@ -67,10 +67,16 @@ fn get_log_file(project_dirs: &ProjectDirs) -> io::Result<PathBuf> {
                         if let Some(index) = index {
                             if let Some(maybe_oldest) = &oldest_log_file {
                                 if index < maybe_oldest.index {
-                                    oldest_log_file = Some(LogFile{ index, path: entry.path()})
+                                    oldest_log_file = Some(LogFile {
+                                        index,
+                                        path: entry.path(),
+                                    })
                                 }
                             } else {
-                                oldest_log_file = Some(LogFile{ index, path: entry.path()})
+                                oldest_log_file = Some(LogFile {
+                                    index,
+                                    path: entry.path(),
+                                })
                             }
                             if let Some(maybe_newest) = &newest_log_index {
                                 if index > *maybe_newest {
@@ -118,7 +124,7 @@ impl Display for CurrentTime {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match SystemTime::UNIX_EPOCH.elapsed() {
             Ok(current_time) => write!(f, "{}", current_time.as_secs()),
-            Err(e) => write!(f, "-{}", e.duration().as_secs())
+            Err(e) => write!(f, "-{}", e.duration().as_secs()),
         }
     }
 }

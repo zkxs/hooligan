@@ -4,13 +4,13 @@
 
 #![windows_subsystem = "windows"] // don't pop up a weird terminal window
 
-use std::{env, io};
 use std::ffi::OsString;
 use std::fs::{self, DirEntry, File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::num::TryFromIntError;
 use std::path::PathBuf;
 use std::process::Command;
+use std::{env, io};
 
 use directories::ProjectDirs;
 
@@ -18,19 +18,16 @@ use crate::config::Config;
 use crate::local_player_moderations as moderation;
 use crate::transaction::{Transaction, Value as TransactionValue};
 
+mod config;
 mod local_player_moderations;
 mod logging;
 mod transaction;
-mod config;
 
 fn main() {
     // toss some global-state type things into a struct to make them easier to access
     let project_dirs = get_project_dirs().expect("failed to get project directory");
     let log = logging::get_logger(&project_dirs).expect("failed to open log file for writing");
-    Hooligan {
-        log,
-        project_dirs,
-    }.run();
+    Hooligan { log, project_dirs }.run();
 }
 
 #[allow(dead_code)] // lint misses usage in debug printing this error
@@ -60,10 +57,13 @@ impl Hooligan {
     }
 
     fn run_checked(&mut self) -> Result<(), Error> {
-        writeln!(self.log, "starting {} version {} {}",
-                 env!("CARGO_PKG_NAME"),
-                 env!("CARGO_PKG_VERSION"),
-                 env!("GIT_COMMIT_HASH"));
+        writeln!(
+            self.log,
+            "starting {} version {} {}",
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION"),
+            env!("GIT_COMMIT_HASH")
+        );
 
         // read config
         let config = self.load_config();
@@ -114,11 +114,15 @@ impl Hooligan {
                 let mut transaction_log_path = self.project_dirs.data_local_dir().join("history");
                 fs::create_dir_all(transaction_log_path.as_path()).map_err(Error::Io)?;
                 let vrcset_os_filename = vrcset_path.file_name().unwrap();
-                let vrcset_filename = vrcset_os_filename.to_str().ok_or_else(|| Error::BadFilename(vrcset_os_filename.to_owned()))?;
+                let vrcset_filename = vrcset_os_filename
+                    .to_str()
+                    .ok_or_else(|| Error::BadFilename(vrcset_os_filename.to_owned()))?;
                 let transaction_log_filename = vrcset_filename
                     .split_once('.')
                     .ok_or_else(|| Error::BadFilename(vrcset_os_filename.to_owned()))?
-                    .0.to_string() + ".history";
+                    .0
+                    .to_string()
+                    + ".history";
                 transaction_log_path.push(transaction_log_filename);
 
                 // read ordered transaction log counting shows since last hide into a map
@@ -147,41 +151,51 @@ impl Hooligan {
                 let mut pending_transactions: Vec<Transaction> = Vec::new(); // track difference between previous data and current data
                 let lines_to_remove = {
                     let line_reader = BufReader::new(&vrcset_file).lines();
-                    line_reader.map(|maybe_line| { // parse the lines handling errors
+                    line_reader.map(|maybe_line| {
+                        // parse the lines handling errors
                         match maybe_line {
                             Ok(line) => moderation::Line::parse(&line).map_err(Error::ShowHideParse),
                             Err(e) => Err(Error::Io(e)),
                         }
                     })
-                }.filter(|line| {
-                    line.as_ref().map_or(true, |line| { // retain errors
+                }
+                .filter(|line| {
+                    line.as_ref().map_or(true, |line| {
+                        // retain errors
 
                         // number of times user was shown since last hide OR None if there is no data
-                        let shows = shows_since_last_hide.as_mut()
-                            .and_then(|map| map.remove(&line.key));
+                        let shows = shows_since_last_hide.as_mut().and_then(|map| map.remove(&line.key));
 
                         match line.value {
-                            moderation::Value::Hide => { // we read a Hide from the vrcset file
+                            moderation::Value::Hide => {
+                                // we read a Hide from the vrcset file
                                 if shows.map(|shows| !shows.is_hidden()).unwrap_or(true) {
                                     // if user was NOT last known to be hidden, record this manual hide
-                                    pending_transactions.push(Transaction::new(line.key.to_owned(), TransactionValue::ManualHide));
+                                    pending_transactions
+                                        .push(Transaction::new(line.key.to_owned(), TransactionValue::ManualHide));
                                 }
                                 true // retain hidden user entries
                             }
-                            moderation::Value::Show => { // we read a Show from the vrcset file
+                            moderation::Value::Show => {
+                                // we read a Show from the vrcset file
                                 // if we see a manual show in this block we need to consider it in the total show count
                                 let extra_shows = if shows.as_ref().map(|shows| !shows.is_shown()).unwrap_or(true) {
                                     // if user was NOT last known to be shown, record this manual show
-                                    pending_transactions.push(Transaction::new(line.key.to_owned(), TransactionValue::ManualShow));
+                                    pending_transactions
+                                        .push(Transaction::new(line.key.to_owned(), TransactionValue::ManualShow));
                                     1
                                 } else {
                                     0
                                 };
 
                                 // check if we've shown this user enough times that the show should stick
-                                if shows.map(|shows| shows.count() + extra_shows < config.auto_hide_threshold).unwrap_or(true) {
+                                if shows
+                                    .map(|shows| shows.count() + extra_shows < config.auto_hide_threshold)
+                                    .unwrap_or(true)
+                                {
                                     // not enough shows; reset the user
-                                    pending_transactions.push(Transaction::new(line.key.to_owned(), TransactionValue::AutoReset));
+                                    pending_transactions
+                                        .push(Transaction::new(line.key.to_owned(), TransactionValue::AutoReset));
                                     removed += 1;
                                     false // remove entry
                                 } else {
@@ -194,27 +208,34 @@ impl Hooligan {
                     })
                 });
                 self.write_lines(&vrcset_file, lines_to_remove, true)?; // overwrite the vrcset file
-                writeln!(self.log, "removed {removed} and retained {retained} shown user entries from {vrcset_filename}");
+                writeln!(
+                    self.log,
+                    "removed {removed} and retained {retained} shown user entries from {vrcset_filename}"
+                );
 
                 // handle any remaining entries in the map
                 if let Some(shows_since_last_hide) = shows_since_last_hide {
                     let mut shown: u32 = 0;
 
-                    let (default_lines, non_default_lines): (Vec<_>, Vec<_>) = shows_since_last_hide.into_iter()
+                    let (default_lines, non_default_lines): (Vec<_>, Vec<_>) = shows_since_last_hide
+                        .into_iter()
                         .partition(|(_, state)| state.is_default());
 
                     // handle manual non-default -> default transitions
-                    non_default_lines.into_iter()
-                        .for_each(|(key, _)| pending_transactions.push(Transaction::new(key, TransactionValue::ManualReset)));
+                    non_default_lines.into_iter().for_each(|(key, _)| {
+                        pending_transactions.push(Transaction::new(key, TransactionValue::ManualReset))
+                    });
 
                     // handle case where the show threshold has lowered: we need to go back and re-show previously reset users
-                    let mut lines_to_show = default_lines.into_iter()
+                    let mut lines_to_show = default_lines
+                        .into_iter()
                         .filter(|(_, show_hide_count)| show_hide_count.count() >= config.auto_hide_threshold)
                         .map(|(key, _)| {
                             shown += 1;
                             pending_transactions.push(Transaction::new(key.clone(), TransactionValue::AutoShow));
                             Ok(moderation::Line::new(key, moderation::Value::Show))
-                        }).peekable();
+                        })
+                        .peekable();
                     if lines_to_show.peek().is_some() {
                         // reopen file in append mode and write these lines
                         let mut open_options = OpenOptions::new();
@@ -234,14 +255,20 @@ impl Hooligan {
         Ok(())
     }
 
-    fn write_lines<T: Iterator<Item=Result<moderation::Line, Error>>>(&mut self, file: &File, line_iter: T, truncate: bool) -> Result<(), Error> {
+    fn write_lines<T: Iterator<Item = Result<moderation::Line, Error>>>(
+        &mut self,
+        file: &File,
+        line_iter: T,
+        truncate: bool,
+    ) -> Result<(), Error> {
         let mut writer = BufWriter::new(file);
         let mut size: u64 = 0;
         for line in line_iter {
             match line {
                 Ok(line) => {
                     let serialized = line.serialize();
-                    size += u64::try_from(writer.write(serialized.as_bytes()).map_err(Error::Io)?).map_err(Error::U64FromInt)?;
+                    size += u64::try_from(writer.write(serialized.as_bytes()).map_err(Error::Io)?)
+                        .map_err(Error::U64FromInt)?;
                 }
                 Err(Error::ShowHideParse(e)) => {
                     writeln!(self.log, "omitting line due to parse error {e:?}");
@@ -249,7 +276,10 @@ impl Hooligan {
                 Err(e) => {
                     // We got some kind of IO Error (or an unexpected error type got passed in)
                     // This is awful and has a high chance of file corruption, but the panic might save us of the BufWriter hasn't flushed yet
-                    writeln!(self.log, "error {e:?} while streaming file modifications; I will now panic");
+                    writeln!(
+                        self.log,
+                        "error {e:?} while streaming file modifications; I will now panic"
+                    );
                     panic!("error {e:?} while streaming file modifications");
                 }
             }
