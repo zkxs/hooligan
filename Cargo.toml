@@ -15,5 +15,10 @@ lto = "fat"
 codegen-units = 1
 strip = true
 
+[profile.release-optimized-debug]
+inherits = "release"
+strip = false # required for `cargo-bloat`
+debug = true # required for `cargo flamegraph`, and makes `cargo-bloat` output significantly better
+
 [dependencies]
 directories = "6"
