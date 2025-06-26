@@ -1,6 +1,6 @@
 // This file is part of hooligan and is licenced under the GNU GPL v3.0.
 // See LICENSE file for full text.
-// Copyright © 2024 Michael Ripley
+// Copyright © 2025 Michael Ripley
 
 #![windows_subsystem = "windows"] // don't pop up a weird terminal window
 
@@ -126,31 +126,28 @@ impl Hooligan {
                 transaction_log_path.push(transaction_log_filename);
 
                 // read ordered transaction log counting shows since last hide into a map
-                let transaction_log_file = {
-                    let mut open_options = OpenOptions::new();
-                    open_options.read(true);
-                    open_options.append(true);
-                    open_options.create(true);
-                    open_options.open(transaction_log_path.as_path()).map_err(Error::Io)?
-                };
+                let transaction_log_file = OpenOptions::new()
+                    .read(true)
+                    .append(true)
+                    .create(true)
+                    .open(transaction_log_path.as_path())
+                    .map_err(Error::Io)?;
                 let mut shows_since_last_hide = if transaction_log_path.is_file() {
                     Some(transaction::read_log(&transaction_log_file)?)
                 } else {
                     None
                 };
 
-                // stream changes to vrcset file
-                let vrcset_file = {
-                    let mut open_options = OpenOptions::new();
-                    open_options.read(true);
-                    open_options.write(true);
-                    open_options.open(vrcset_path.as_path()).map_err(Error::Io)?
-                };
+                // stream changes to vrcset file. By this I mean we are interleaving reads and writes to the same file.
                 let mut removed: u32 = 0; // track removed lines
                 let mut retained: u32 = 0; // track retained lines that we would have normally removed, if not for the threshold
                 let mut pending_transactions: Vec<Transaction> = Vec::new(); // track difference between previous data and current data
                 let lines_to_remove = {
-                    let line_reader = BufReader::new(&vrcset_file).lines();
+                    let vrcset_file = OpenOptions::new()
+                        .read(true)
+                        .open(vrcset_path.as_path())
+                        .map_err(Error::Io)?;
+                    let line_reader = BufReader::new(vrcset_file).lines();
                     line_reader.map(|maybe_line| {
                         // parse the lines handling errors
                         match maybe_line {
@@ -207,7 +204,13 @@ impl Hooligan {
                         }
                     })
                 });
-                self.write_lines(&vrcset_file, lines_to_remove, true)?; // overwrite the vrcset file
+                {
+                    let vrcset_file = OpenOptions::new()
+                        .write(true)
+                        .open(vrcset_path.as_path())
+                        .map_err(Error::Io)?;
+                    self.write_lines(&vrcset_file, lines_to_remove, true)?; // overwrite the vrcset file
+                }
                 writeln!(
                     self.log,
                     "removed {removed} and retained {retained} shown user entries from {vrcset_filename}"
@@ -226,7 +229,7 @@ impl Hooligan {
                         pending_transactions.push(Transaction::new(key, TransactionValue::ManualReset))
                     });
 
-                    // handle case where the show threshold has lowered: we need to go back and re-show previously reset users
+                    // handle case where the auto-hide threshold has lowered: we need to go back and re-show previously reset users
                     let mut lines_to_show = default_lines
                         .into_iter()
                         .filter(|(_, show_hide_count)| show_hide_count.count() >= config.auto_hide_threshold)
@@ -238,9 +241,10 @@ impl Hooligan {
                         .peekable();
                     if lines_to_show.peek().is_some() {
                         // reopen file in append mode and write these lines
-                        let mut open_options = OpenOptions::new();
-                        open_options.append(true);
-                        let vrcset_file = open_options.open(vrcset_path.as_path()).map_err(Error::Io)?;
+                        let vrcset_file = OpenOptions::new()
+                            .append(true)
+                            .open(vrcset_path.as_path())
+                            .map_err(Error::Io)?;
                         self.write_lines(&vrcset_file, lines_to_show, false)?;
                         writeln!(self.log, "added {shown} shown user entries to {vrcset_filename}");
                     }
@@ -255,6 +259,18 @@ impl Hooligan {
         Ok(())
     }
 
+    /// Write lines to a *.vrcset file. It is NOT required to open the file in truncate mode: truncation is handled by this function.
+    ///
+    /// Note that `line_iter` is allowed to lazily perform reads to the same file we are writing to, albeit using a distinct file handle.
+    ///
+    /// **SPOOKY BEHAVIOR WARNING:** If this function fails partway through it will leave the *.vrcset file in a corrupted state.
+    /// This can happen in edge cases including:
+    /// - out of memory: (various small heap allocations occur in the function)
+    /// - out of storage: (bytes are being written to disk)
+    /// - weird filesystem edge cases, such as file permissions being change mid-write.
+    ///
+    /// Probably the easiest safety thing here would just be to have the filesystem make a backup copy before I do any writes,
+    /// but that is not presently implement.
     fn write_lines<T: Iterator<Item = Result<moderation::Line, Error>>>(
         &mut self,
         file: &File,

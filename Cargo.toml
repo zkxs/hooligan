@@ -22,3 +22,6 @@ debug = true # required for `cargo flamegraph`, and makes `cargo-bloat` output s
 
 [dependencies]
 directories = "6"
+
+[dev-dependencies]
+rand = "0.9"

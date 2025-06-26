@@ -56,6 +56,6 @@ into something with terrible performance while you're not playing. Also, I like 
 
 ## License
 
-Copyright 2024
+Copyright 2025
 
 Hooligan is provided under the [GPL-3.0 license](LICENSE).
