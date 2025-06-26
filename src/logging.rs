@@ -13,8 +13,12 @@ use std::{fmt, fs, io};
 
 use directories::ProjectDirs;
 
-/// maximum number of log files to retain, including the latest
-const MAX_LOG_FILES: u32 = 10;
+/// Maximum number of log files to retain, including the latest.
+const MAX_LOG_FILES: u32 = 3;
+
+/// Maximum log file size after which to stop reusing the file for new program runs.
+/// Set to 2MiB for now, so with 3 files we could have slightly more than 6MiB of logs.
+const MAX_FILE_SIZE: u64 = 2 * 1024 * 1024;
 
 /// `new_index - old_index` threshold above which we delete the oldest file
 /// if there are 10 log files on disk, then `new_index - old_index == 9`.
@@ -39,22 +43,22 @@ impl LogWriter {
 
 /// Get a logger that can be used with `writeln!()` and logs to a rotating file.
 pub fn get_logger(project_dirs: &ProjectDirs) -> io::Result<LogWriter> {
-    let mut open_options = OpenOptions::new();
-    open_options.append(true);
-    open_options.create_new(true);
-    let file = open_options.open(get_log_file(project_dirs)?)?;
+    let file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(get_log_file(project_dirs)?)?;
     let buf_writer = BufWriter::new(file);
     Ok(LogWriter { write: buf_writer })
 }
 
 /// Get the log file
 fn get_log_file(project_dirs: &ProjectDirs) -> io::Result<PathBuf> {
-    let mut log_file_prefix_path = create_log_dir_path(project_dirs)?;
-    let dir_iter = fs::read_dir(log_file_prefix_path.as_path())?;
+    let mut path = create_log_dir_path(project_dirs)?;
+    let dir_iter = fs::read_dir(path.as_path())?;
 
     // scan all files and record information about oldest and newest files
     let mut oldest_log_file: Option<LogFile> = None;
-    let mut newest_log_index: Option<u32> = None;
+    let mut newest_log_file: Option<LogFile> = None;
     for entry in dir_iter {
         let entry = entry?;
         if entry.file_type()?.is_file() {
@@ -78,12 +82,18 @@ fn get_log_file(project_dirs: &ProjectDirs) -> io::Result<PathBuf> {
                                     path: entry.path(),
                                 })
                             }
-                            if let Some(maybe_newest) = &newest_log_index {
-                                if index > *maybe_newest {
-                                    newest_log_index = Some(index);
+                            if let Some(maybe_newest) = &newest_log_file {
+                                if index > maybe_newest.index {
+                                    newest_log_file = Some(LogFile {
+                                        index,
+                                        path: entry.path(),
+                                    });
                                 }
                             } else {
-                                newest_log_index = Some(index);
+                                newest_log_file = Some(LogFile {
+                                    index,
+                                    path: entry.path(),
+                                });
                             }
                         }
                     }
@@ -92,17 +102,29 @@ fn get_log_file(project_dirs: &ProjectDirs) -> io::Result<PathBuf> {
         }
     }
 
-    // handle deleting the oldest log file if we are at the max log file limit
-    if let (Some(oldest_log_file), Some(newest_log_index)) = (oldest_log_file, newest_log_index) {
-        if newest_log_index - oldest_log_file.index > MAX_LOG_INDEX_DIFFERENCE {
-            fs::remove_file(oldest_log_file.path)?;
-        }
-    }
+    let use_last = if let Some(newest_log_file) = &newest_log_file {
+        let metadata = newest_log_file.path.metadata()?;
+        metadata.len() < MAX_FILE_SIZE
+    } else {
+        false
+    };
 
-    // create the new log file
-    let index = newest_log_index.map(|index| index + 1).unwrap_or(0);
-    log_file_prefix_path.push(format!("hooligan.{}.log", index));
-    Ok(log_file_prefix_path)
+    if use_last {
+        // last log file is small enough to reuse. No need to delete file over the count limit, as we aren't making a new file!
+        Ok(newest_log_file.unwrap().path)
+    } else {
+        // handle deleting the oldest log file if we are at the max log file limit
+        if let (Some(oldest_log_file), Some(newest_log_file)) = (oldest_log_file, &newest_log_file) {
+            if newest_log_file.index - oldest_log_file.index > MAX_LOG_INDEX_DIFFERENCE {
+                fs::remove_file(oldest_log_file.path)?;
+            }
+        }
+
+        // create the new log file
+        let index = newest_log_file.map(|file| file.index + 1).unwrap_or(0);
+        path.push(format!("hooligan.{}.log", index));
+        Ok(path)
+    }
 }
 
 /// Ensure logging directory exists, and return it
