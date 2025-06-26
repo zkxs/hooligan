@@ -9,25 +9,24 @@ use std::fs::{self, DirEntry, File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::num::TryFromIntError;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, ExitCode};
 use std::{env, io};
-
-use directories::ProjectDirs;
 
 use crate::config::Config;
 use crate::local_player_moderations as moderation;
 use crate::transaction::{Transaction, Value as TransactionValue};
+use directories::ProjectDirs;
 
 mod config;
 mod local_player_moderations;
 mod logging;
 mod transaction;
 
-fn main() {
+fn main() -> ExitCode {
     // toss some global-state type things into a struct to make them easier to access
     let project_dirs = get_project_dirs().expect("failed to get project directory");
     let log = logging::get_logger(&project_dirs).expect("failed to open log file for writing");
-    Hooligan { log, project_dirs }.run();
+    Hooligan { log, project_dirs }.run()
 }
 
 #[allow(dead_code)] // lint misses usage in debug printing this error
@@ -48,12 +47,52 @@ struct Hooligan {
 }
 
 impl Hooligan {
-    fn run(mut self) {
-        match self.run_checked() {
-            Ok(()) => writeln!(self.log, "done"),
-            Err(e) => writeln!(self.log, "{e:?}"),
-        }
+    fn run(mut self) -> ExitCode {
+        let lockfile = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(self.project_dirs.data_local_dir().join("hooligan.lock"));
+        let exit_code = match lockfile {
+            Ok(lockfile) => {
+                let mut lock = fd_lock::RwLock::new(lockfile);
+                match lock.try_write() {
+                    Ok(lock) => {
+                        let exit_code = match self.run_checked() {
+                            Ok(()) => {
+                                writeln!(self.log, "done");
+                                ExitCode::SUCCESS
+                            }
+                            Err(e) => {
+                                writeln!(self.log, "{e:?}");
+                                ExitCode::FAILURE // 1 on Windows
+                            }
+                        };
+
+                        drop(lock);
+
+                        exit_code
+                    }
+                    Err(e) => match e.kind() {
+                        io::ErrorKind::WouldBlock => {
+                            writeln!(self.log, "aborting because hooligan.lock is owned by another process");
+                            ExitCode::from(3)
+                        }
+                        _ => {
+                            writeln!(self.log, "unknown failure acquiring hooligan.lock: {e:?}");
+                            ExitCode::from(4)
+                        }
+                    },
+                }
+            }
+            Err(e) => {
+                writeln!(self.log, "error opening hooligan.lock {e:?}");
+                ExitCode::from(2)
+            }
+        };
         self.log.flush().expect("failed to flush log buffer to disk");
+        exit_code
     }
 
     fn run_checked(&mut self) -> Result<(), Error> {

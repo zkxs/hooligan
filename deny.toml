@@ -212,6 +212,7 @@ skip = [
 skip-tree = [
     #"ansi_term@0.11.0", # will be skipped along with _all_ of its direct and transitive dependencies
     #{ crate = "ansi_term@0.11.0", depth = 20 },
+    { crate = "windows-sys@0.59", reason = "old winapi bindings" }
 ]
 
 # This section is considered when running `cargo deny check sources`.
