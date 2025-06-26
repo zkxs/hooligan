@@ -9,9 +9,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    target-branch: "prerelease"
+    target-branch: "master"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-    target-branch: "prerelease"
+    target-branch: "master"
