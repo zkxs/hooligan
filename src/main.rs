@@ -363,7 +363,7 @@ impl Hooligan {
 }
 
 /// calculate the path to %UserProfile%\AppData\LocalLow\VRChat\VRChat\LocalPlayerModerations
-/// 
+///
 /// **Platform support**: This contains a hardcoded path that only works on Windows... which should be fine as VRChat
 /// only supports Windows.
 fn get_local_player_moderations_path() -> Result<PathBuf, Error> {
