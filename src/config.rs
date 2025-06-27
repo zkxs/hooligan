@@ -50,7 +50,7 @@ impl Config {
     }
 
     pub fn serialize<P: AsRef<Path>>(&self, path: P) -> Result<(), io::Error> {
-        let file = File::create_new(path).unwrap();
+        let file = File::create_new(path)?;
         let mut writer = BufWriter::new(file);
         writeln!(writer, "{}={}", AUTO_HIDE_THRESHOLD, self.auto_hide_threshold)?;
         writer.flush()

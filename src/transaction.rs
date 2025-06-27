@@ -20,9 +20,9 @@ const MANUAL_SHOW: &str = "MANUAL_SHOW";
 /// to a *.vrcset file
 pub struct Transaction {
     /// referenced user
-    pub key: String,
+    key: String,
     /// the event
-    pub value: Value,
+    value: Value,
 }
 
 impl Transaction {
@@ -114,18 +114,18 @@ impl ShowHideCount {
     }
 
     /// Reset the running shows-since-last-hide count and set the state
-    fn reset(&mut self, state: ShowHideState) {
+    const fn reset(&mut self, state: ShowHideState) {
         self.count = 0;
         self.state = state;
     }
 
     /// Increment the running shows-since-last-hide count and set the state
-    fn increment(&mut self, state: ShowHideState) {
+    const fn increment(&mut self, state: ShowHideState) {
         self.count += 1;
         self.state = state;
     }
 
-    fn set_state(&mut self, state: ShowHideState) {
+    const fn set_state(&mut self, state: ShowHideState) {
         self.state = state;
     }
 

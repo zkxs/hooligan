@@ -200,15 +200,15 @@ impl Hooligan {
                         // retain errors
 
                         // number of times user was shown since last hide OR None if there is no data
-                        let shows = shows_since_last_hide.as_mut().and_then(|map| map.remove(&line.key));
+                        let shows = shows_since_last_hide.as_mut().and_then(|map| map.remove(line.key()));
 
-                        match line.value {
+                        match line.value() {
                             moderation::Value::Hide => {
                                 // we read a Hide from the vrcset file
                                 if shows.map(|shows| !shows.is_hidden()).unwrap_or(true) {
                                     // if user was NOT last known to be hidden, record this manual hide
                                     pending_transactions
-                                        .push(Transaction::new(line.key.to_owned(), TransactionValue::ManualHide));
+                                        .push(Transaction::new(line.key().to_owned(), TransactionValue::ManualHide));
                                 }
                                 true // retain hidden user entries
                             }
@@ -218,7 +218,7 @@ impl Hooligan {
                                 let extra_shows = if shows.as_ref().map(|shows| !shows.is_shown()).unwrap_or(true) {
                                     // if user was NOT last known to be shown, record this manual show
                                     pending_transactions
-                                        .push(Transaction::new(line.key.to_owned(), TransactionValue::ManualShow));
+                                        .push(Transaction::new(line.key().to_owned(), TransactionValue::ManualShow));
                                     1
                                 } else {
                                     0
@@ -231,7 +231,7 @@ impl Hooligan {
                                 {
                                     // not enough shows; reset the user
                                     pending_transactions
-                                        .push(Transaction::new(line.key.to_owned(), TransactionValue::AutoReset));
+                                        .push(Transaction::new(line.key().to_owned(), TransactionValue::AutoReset));
                                     removed += 1;
                                     false // remove entry
                                 } else {
@@ -326,7 +326,9 @@ impl Hooligan {
                         .map_err(Error::U64FromInt)?;
                 }
                 Err(Error::ShowHideParse(e)) => {
-                    writeln!(self.log, "omitting line due to parse error {e:?}");
+                    size += u64::try_from(writer.write(e.raw_line().as_bytes()).map_err(Error::Io)?)
+                        .map_err(Error::U64FromInt)?;
+                    writeln!(self.log, "not touching line due to parse error: {e:?}");
                 }
                 Err(e) => {
                     // We got some kind of IO Error (or an unexpected error type got passed in)

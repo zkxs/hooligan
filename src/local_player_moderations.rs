@@ -1,6 +1,6 @@
 // This file is part of hooligan and is licenced under the GNU GPL v3.0.
 // See LICENSE file for full text.
-// Copyright © 2024 Michael Ripley
+// Copyright © 2025 Michael Ripley
 
 //! Serialization and deserialization logic for the LocalPlayerModerations file format
 
@@ -10,9 +10,9 @@ const SHOW_AVATAR_VALUE: &str = "005";
 #[derive(PartialEq, Eq, Debug)]
 pub struct Line {
     /// UTF-8 encoded key
-    pub key: String,
+    key: String,
     /// integer in the range \[000,999]
-    pub value: Value,
+    value: Value,
 }
 
 impl Line {
@@ -22,15 +22,15 @@ impl Line {
 
     pub fn parse(line: &str) -> Result<Self, ParseError> {
         let mut split = line.split(' ').filter(|s| !s.is_empty());
-        let key = split.next().ok_or_else(|| ParseError::BadSplit(line.to_owned()))?;
-        let value = split.next().ok_or_else(|| ParseError::BadSplit(line.to_owned()))?;
+        let key = split.next().ok_or_else(|| ParseError::bad_split(line.to_owned()))?;
+        let value = split.next().ok_or_else(|| ParseError::bad_split(line.to_owned()))?;
 
         // assert that there are only two things in the split output
         if split.next().is_some() {
-            return Err(ParseError::BadSplit(line.to_owned()));
+            return Err(ParseError::bad_split(line.to_owned()));
         }
 
-        let value: Value = Value::parse(value)?;
+        let value: Value = Value::parse(value).map_err(|_| ParseError::unknown_value(line.to_owned()))?;
         let key = key.to_owned();
 
         Ok(Self { key, value })
@@ -38,6 +38,14 @@ impl Line {
 
     pub fn serialize(&self) -> String {
         format!("{:63} {}\r\n", self.key, self.value.serialize())
+    }
+
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    pub const fn value(&self) -> &Value {
+        &self.value
     }
 }
 
@@ -49,11 +57,11 @@ pub enum Value {
 
 impl Value {
     /// `value` is an integer in the range \[000,999]
-    fn parse(value: &str) -> Result<Self, ParseError> {
+    fn parse(value: &str) -> Result<Self, UnknownValue> {
         match value {
             HIDE_AVATAR_VALUE => Ok(Self::Hide),
             SHOW_AVATAR_VALUE => Ok(Self::Show),
-            unknown_value => Err(ParseError::UnknownValue(unknown_value.to_owned())),
+            _ => Err(UnknownValue),
         }
     }
 
@@ -65,10 +73,39 @@ impl Value {
     }
 }
 
+/// zero-size flag to indicate we got an unknown value when parsing the show/hide number
+struct UnknownValue;
+
 #[derive(PartialEq, Eq, Debug)]
-pub enum ParseError {
-    BadSplit(String),
-    UnknownValue(String),
+pub struct ParseError {
+    raw_line: String,
+    error_type: ParseErrorType,
+}
+
+impl ParseError {
+    const fn bad_split(line: String) -> Self {
+        Self {
+            raw_line: line,
+            error_type: ParseErrorType::BadSplit,
+        }
+    }
+
+    const fn unknown_value(line: String) -> Self {
+        Self {
+            raw_line: line,
+            error_type: ParseErrorType::UnknownValue,
+        }
+    }
+
+    pub fn raw_line(&self) -> &str {
+        &self.raw_line
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub enum ParseErrorType {
+    BadSplit,
+    UnknownValue,
 }
 
 #[cfg(test)]
@@ -108,14 +145,16 @@ mod tests {
     #[test]
     fn test_line_unknown_value() {
         let actual = Line::parse("2ZaOGztkpc                                                      009").unwrap_err();
-        let expected = ParseError::UnknownValue("009".to_string());
+        let expected = ParseError::unknown_value(
+            "2ZaOGztkpc                                                      009".to_string(),
+        );
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn test_line_bad_split_not_enough() {
         let actual = Line::parse("2ZaOGztkpc").unwrap_err();
-        let expected = ParseError::BadSplit("2ZaOGztkpc".to_string());
+        let expected = ParseError::bad_split("2ZaOGztkpc".to_string());
         assert_eq!(actual, expected);
     }
 
@@ -123,8 +162,9 @@ mod tests {
     fn test_line_bad_split_too_many() {
         let actual =
             Line::parse("2ZaOGztkpc                                                      foo bar").unwrap_err();
-        let expected =
-            ParseError::BadSplit("2ZaOGztkpc                                                      foo bar".to_string());
+        let expected = ParseError::bad_split(
+            "2ZaOGztkpc                                                      foo bar".to_string(),
+        );
         assert_eq!(actual, expected);
     }
 }
