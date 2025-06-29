@@ -2,20 +2,21 @@
 // See LICENSE file for full text.
 // Copyright © 2025 Michael Ripley
 
-#![windows_subsystem = "windows"] // don't pop up a weird terminal window
-
-use std::ffi::OsString;
-use std::fs::{self, DirEntry, File, OpenOptions};
-use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::num::TryFromIntError;
-use std::path::PathBuf;
-use std::process::{Command, ExitCode};
-use std::{env, io};
+// don't pop up a weird terminal window
+#![cfg_attr(not(test), windows_subsystem = "windows")]
 
 use crate::config::Config;
 use crate::local_player_moderations as moderation;
 use crate::transaction::{Transaction, Value as TransactionValue};
+use bstr::io::BufReadExt;
 use directories::ProjectDirs;
+use std::ffi::OsString;
+use std::fs::{self, DirEntry, File, OpenOptions};
+use std::io::{BufReader, BufWriter, Write};
+use std::num::TryFromIntError;
+use std::path::PathBuf;
+use std::process::{Command, ExitCode};
+use std::{env, io};
 
 mod config;
 mod local_player_moderations;
@@ -186,7 +187,7 @@ impl Hooligan {
                         .read(true)
                         .open(vrcset_path.as_path())
                         .map_err(Error::Io)?;
-                    let line_reader = BufReader::new(vrcset_file).lines();
+                    let line_reader = BufReader::new(vrcset_file).byte_lines();
                     line_reader.map(|maybe_line| {
                         // parse the lines handling errors
                         match maybe_line {
@@ -207,8 +208,10 @@ impl Hooligan {
                                 // we read a Hide from the vrcset file
                                 if shows.map(|shows| !shows.is_hidden()).unwrap_or(true) {
                                     // if user was NOT last known to be hidden, record this manual hide
-                                    pending_transactions
-                                        .push(Transaction::new(line.key().to_owned(), TransactionValue::ManualHide));
+                                    pending_transactions.push(Transaction::new(
+                                        line.key().to_owned().into_boxed_slice(),
+                                        TransactionValue::ManualHide,
+                                    ));
                                 }
                                 true // retain hidden user entries
                             }
@@ -217,8 +220,10 @@ impl Hooligan {
                                 // if we see a manual show in this block we need to consider it in the total show count
                                 let extra_shows = if shows.as_ref().map(|shows| !shows.is_shown()).unwrap_or(true) {
                                     // if user was NOT last known to be shown, record this manual show
-                                    pending_transactions
-                                        .push(Transaction::new(line.key().to_owned(), TransactionValue::ManualShow));
+                                    pending_transactions.push(Transaction::new(
+                                        line.key().to_owned().into_boxed_slice(),
+                                        TransactionValue::ManualShow,
+                                    ));
                                     1
                                 } else {
                                     0
@@ -231,7 +236,7 @@ impl Hooligan {
                                 {
                                     // not enough shows; reset the user
                                     pending_transactions
-                                        .push(Transaction::new(line.key().to_owned(), TransactionValue::AutoReset));
+                                        .push(Transaction::new(line.key().into(), TransactionValue::AutoReset));
                                     removed += 1;
                                     false // remove entry
                                 } else {
@@ -321,13 +326,11 @@ impl Hooligan {
         for line in line_iter {
             match line {
                 Ok(line) => {
-                    let serialized = line.serialize();
-                    size += u64::try_from(writer.write(serialized.as_bytes()).map_err(Error::Io)?)
-                        .map_err(Error::U64FromInt)?;
+                    size +=
+                        u64::try_from(line.serialize(&mut writer).map_err(Error::Io)?).map_err(Error::U64FromInt)?;
                 }
                 Err(Error::ShowHideParse(e)) => {
-                    size += u64::try_from(writer.write(e.raw_line().as_bytes()).map_err(Error::Io)?)
-                        .map_err(Error::U64FromInt)?;
+                    size += u64::try_from(e.serialize(&mut writer).map_err(Error::Io)?).map_err(Error::U64FromInt)?;
                     writeln!(self.log, "not touching line due to parse error: {e:?}");
                 }
                 Err(e) => {

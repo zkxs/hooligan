@@ -32,7 +32,7 @@ pub struct LogWriter {
 impl LogWriter {
     /// evil hack to write timestamps in logs
     pub fn write_fmt(&mut self, args: fmt::Arguments<'_>) {
-        write!(self.write, "{}: ", CurrentTime).expect("failed to write log timestamp");
+        write!(self.write, "{CurrentTime}: ").expect("failed to write log timestamp");
         self.write.write_fmt(args).expect("failed to write log arguments");
     }
 
@@ -122,7 +122,7 @@ fn get_log_file(project_dirs: &ProjectDirs) -> io::Result<PathBuf> {
 
         // create the new log file
         let index = newest_log_file.map(|file| file.index + 1).unwrap_or(0);
-        path.push(format!("hooligan.{}.log", index));
+        path.push(format!("hooligan.{index}.log"));
         Ok(path)
     }
 }

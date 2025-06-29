@@ -21,6 +21,7 @@ strip = false # required for `cargo-bloat`
 debug = true # required for `cargo flamegraph`, and makes `cargo-bloat` output significantly better
 
 [dependencies]
+bstr = "1"
 directories = "6"
 fd-lock = "4"
 

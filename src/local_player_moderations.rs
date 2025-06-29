@@ -4,43 +4,67 @@
 
 //! Serialization and deserialization logic for the LocalPlayerModerations file format
 
-const HIDE_AVATAR_VALUE: &str = "004";
-const SHOW_AVATAR_VALUE: &str = "005";
+use bstr::ByteSlice;
+use std::io;
+use std::io::Write;
+
+const HIDE_AVATAR_VALUE: &[u8] = b"004";
+const SHOW_AVATAR_VALUE: &[u8] = b"005";
+
+/// pre-generated slice of 64 spaces to be used for padding
+static PADDING: &[u8] = &[b' '; 64];
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Line {
     /// UTF-8 encoded key
-    key: String,
+    key: Box<[u8]>,
     /// integer in the range \[000,999]
     value: Value,
 }
 
 impl Line {
-    pub const fn new(key: String, value: Value) -> Self {
+    pub const fn new(key: Box<[u8]>, value: Value) -> Self {
         Self { key, value }
     }
 
-    pub fn parse(line: &str) -> Result<Self, ParseError> {
-        let mut split = line.split(' ').filter(|s| !s.is_empty());
-        let key = split.next().ok_or_else(|| ParseError::bad_split(line.to_owned()))?;
-        let value = split.next().ok_or_else(|| ParseError::bad_split(line.to_owned()))?;
-
-        // assert that there are only two things in the split output
-        if split.next().is_some() {
-            return Err(ParseError::bad_split(line.to_owned()));
+    pub fn parse(line: &[u8]) -> Result<Self, ParseError> {
+        let first_space = line.find_byte(b' ');
+        if let Some(first_space) = first_space {
+            let last_space = line.rfind_byte(b' ').unwrap();
+            let key = &line[..first_space];
+            let value = &line[last_space + 1..];
+            if value.is_empty() {
+                // either the value was missing or there was some trailing space
+                Err(ParseError::bad_split(line))
+            } else {
+                // all seems well
+                let value: Value = Value::parse(value).map_err(|_| ParseError::unknown_value(line))?;
+                let key = key.to_owned().into_boxed_slice();
+                Ok(Self { key, value })
+            }
+        } else {
+            // there was no space present
+            Err(ParseError::bad_split(line))
         }
-
-        let value: Value = Value::parse(value).map_err(|_| ParseError::unknown_value(line.to_owned()))?;
-        let key = key.to_owned();
-
-        Ok(Self { key, value })
     }
 
-    pub fn serialize(&self) -> String {
-        format!("{:63} {}\r\n", self.key, self.value.serialize())
+    pub fn serialize(&self, writer: &mut impl Write) -> io::Result<usize> {
+        let mut written = 0;
+
+        // write key
+        written += writer.write(&self.key)?;
+
+        // pad with space out to 64
+        let spaces = 64 - written;
+        written += writer.write(&PADDING[..spaces])?;
+
+        // write value
+        written += writer.write(self.value.serialize())?;
+
+        Ok(written)
     }
 
-    pub fn key(&self) -> &str {
+    pub fn key(&self) -> &[u8] {
         &self.key
     }
 
@@ -57,7 +81,7 @@ pub enum Value {
 
 impl Value {
     /// `value` is an integer in the range \[000,999]
-    fn parse(value: &str) -> Result<Self, UnknownValue> {
+    const fn parse(value: &[u8]) -> Result<Self, UnknownValue> {
         match value {
             HIDE_AVATAR_VALUE => Ok(Self::Hide),
             SHOW_AVATAR_VALUE => Ok(Self::Show),
@@ -65,7 +89,7 @@ impl Value {
         }
     }
 
-    const fn serialize(&self) -> &str {
+    const fn serialize(&self) -> &[u8] {
         match self {
             Self::Hide => HIDE_AVATAR_VALUE,
             Self::Show => SHOW_AVATAR_VALUE,
@@ -78,27 +102,30 @@ struct UnknownValue;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct ParseError {
-    raw_line: String,
+    raw_line: Box<[u8]>,
     error_type: ParseErrorType,
 }
 
 impl ParseError {
-    const fn bad_split(line: String) -> Self {
+    fn bad_split(line: &[u8]) -> Self {
         Self {
-            raw_line: line,
+            raw_line: line.to_owned().into_boxed_slice(),
             error_type: ParseErrorType::BadSplit,
         }
     }
 
-    const fn unknown_value(line: String) -> Self {
+    fn unknown_value(line: &[u8]) -> Self {
         Self {
-            raw_line: line,
+            raw_line: line.to_owned().into_boxed_slice(),
             error_type: ParseErrorType::UnknownValue,
         }
     }
 
-    pub fn raw_line(&self) -> &str {
-        &self.raw_line
+    pub fn serialize(&self, writer: &mut impl Write) -> io::Result<usize> {
+        let mut written = 0;
+        written += writer.write(self.raw_line.as_bytes())?;
+        written += writer.write(b"\r\n")?;
+        Ok(written)
     }
 }
 
@@ -114,9 +141,9 @@ mod tests {
 
     #[test]
     fn test_line_hide() {
-        let actual = Line::parse("usr_6b683acd-31a6-495d-aa46-a73c1349f462                        004").unwrap();
+        let actual = Line::parse(b"usr_6b683acd-31a6-495d-aa46-a73c1349f462                        004").unwrap();
         let expected = Line {
-            key: "usr_6b683acd-31a6-495d-aa46-a73c1349f462".to_string(),
+            key: b"usr_6b683acd-31a6-495d-aa46-a73c1349f462".to_vec().into_boxed_slice(),
             value: Value::Hide,
         };
         assert_eq!(actual, expected);
@@ -124,9 +151,9 @@ mod tests {
 
     #[test]
     fn test_line_show() {
-        let actual = Line::parse("usr_6b683acd-31a6-495d-aa46-a73c1349f462                        005").unwrap();
+        let actual = Line::parse(b"usr_6b683acd-31a6-495d-aa46-a73c1349f462                        005").unwrap();
         let expected = Line {
-            key: "usr_6b683acd-31a6-495d-aa46-a73c1349f462".to_string(),
+            key: b"usr_6b683acd-31a6-495d-aa46-a73c1349f462".to_vec().into_boxed_slice(),
             value: Value::Show,
         };
         assert_eq!(actual, expected);
@@ -134,9 +161,9 @@ mod tests {
 
     #[test]
     fn test_line_weird() {
-        let actual = Line::parse("2ZaOGztkpc                                                      005").unwrap();
+        let actual = Line::parse(b"2ZaOGztkpc                                                      005").unwrap();
         let expected = Line {
-            key: "2ZaOGztkpc".to_string(),
+            key: b"2ZaOGztkpc".to_vec().into_boxed_slice(),
             value: Value::Show,
         };
         assert_eq!(actual, expected);
@@ -144,27 +171,25 @@ mod tests {
 
     #[test]
     fn test_line_unknown_value() {
-        let actual = Line::parse("2ZaOGztkpc                                                      009").unwrap_err();
-        let expected = ParseError::unknown_value(
-            "2ZaOGztkpc                                                      009".to_string(),
-        );
+        let actual = Line::parse(b"2ZaOGztkpc                                                      009").unwrap_err();
+        let expected =
+            ParseError::unknown_value(b"2ZaOGztkpc                                                      009");
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn test_line_bad_split_not_enough() {
-        let actual = Line::parse("2ZaOGztkpc").unwrap_err();
-        let expected = ParseError::bad_split("2ZaOGztkpc".to_string());
+        let actual = Line::parse(b"2ZaOGztkpc").unwrap_err();
+        let expected = ParseError::bad_split(b"2ZaOGztkpc");
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn test_line_bad_split_too_many() {
         let actual =
-            Line::parse("2ZaOGztkpc                                                      foo bar").unwrap_err();
-        let expected = ParseError::bad_split(
-            "2ZaOGztkpc                                                      foo bar".to_string(),
-        );
+            Line::parse(b"2ZaOGztkpc                                                      foo bar").unwrap_err();
+        let expected =
+            ParseError::bad_split(b"2ZaOGztkpc                                                      foo bar");
         assert_eq!(actual, expected);
     }
 }

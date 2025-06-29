@@ -2,45 +2,52 @@
 // See LICENSE file for full text.
 // Copyright © 2025 Michael Ripley
 
+use ParseError::UnknownValue;
+use bstr::ByteSlice;
+use bstr::io::BufReadExt;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
-
-use ParseError::UnknownValue;
+use std::io;
+use std::io::{BufReader, BufWriter, Write};
 
 use crate::Error;
 
-const AUTO_RESET: &str = "AUTO_RESET";
-const AUTO_SHOW: &str = "AUTO_SHOW";
-const MANUAL_HIDE: &str = "MANUAL_HIDE";
-const MANUAL_RESET: &str = "MANUAL_RESET";
-const MANUAL_SHOW: &str = "MANUAL_SHOW";
+const AUTO_RESET: &[u8] = b"AUTO_RESET";
+const AUTO_SHOW: &[u8] = b"AUTO_SHOW";
+const MANUAL_HIDE: &[u8] = b"MANUAL_HIDE";
+const MANUAL_RESET: &[u8] = b"MANUAL_RESET";
+const MANUAL_SHOW: &[u8] = b"MANUAL_SHOW";
 
 /// A single transaction from the ordered transaction log hooligan uses to track changes over time
 /// to a *.vrcset file
 pub struct Transaction {
     /// referenced user
-    key: String,
+    key: Box<[u8]>,
     /// the event
     value: Value,
 }
 
 impl Transaction {
-    pub const fn new(key: String, value: Value) -> Self {
+    pub const fn new(key: Box<[u8]>, value: Value) -> Self {
         Self { key, value }
     }
 
-    pub fn parse(value: &str) -> Result<Self, ParseError> {
+    pub fn parse(value: &[u8]) -> Result<Self, ParseError> {
         let (key, value) = value
-            .split_once(' ')
-            .ok_or_else(|| ParseError::BadSplit(value.to_owned()))?;
-        let key = key.to_owned();
+            .split_once_str(b" ")
+            .ok_or_else(|| ParseError::BadSplit(value.to_owned().into_boxed_slice()))?;
+        let key = key.to_owned().into_boxed_slice();
         let value = Value::parse(value)?;
         Ok(Self { key, value })
     }
 
-    pub fn serialize(&self) -> String {
-        format!("{} {}\n", self.key, self.value.serialize())
+    pub fn serialize(&self, writer: &mut impl Write) -> io::Result<usize> {
+        let mut written = 0;
+        written += writer.write(&self.key)?;
+        written += writer.write(b" ")?;
+        written += writer.write(self.value.serialize())?;
+        written += writer.write(b"\n")?;
+        Ok(written)
     }
 }
 
@@ -61,18 +68,18 @@ pub enum Value {
 }
 
 impl Value {
-    fn parse(value: &str) -> Result<Self, ParseError> {
+    fn parse(value: &[u8]) -> Result<Self, ParseError> {
         match value {
             AUTO_RESET => Ok(Self::AutoReset),
             AUTO_SHOW => Ok(Self::AutoShow),
             MANUAL_HIDE => Ok(Self::ManualHide),
             MANUAL_RESET => Ok(Self::ManualReset),
             MANUAL_SHOW => Ok(Self::ManualShow),
-            unknown => Err(UnknownValue(unknown.to_owned())),
+            unknown => Err(UnknownValue(unknown.to_owned().into_boxed_slice())),
         }
     }
 
-    const fn serialize(&self) -> &str {
+    const fn serialize(&self) -> &[u8] {
         match self {
             Self::AutoReset => AUTO_RESET,
             Self::AutoShow => AUTO_SHOW,
@@ -86,8 +93,8 @@ impl Value {
 #[allow(dead_code)] // lint misses usage in debug printing this error
 #[derive(Debug)]
 pub enum ParseError {
-    BadSplit(String),
-    UnknownValue(String),
+    BadSplit(Box<[u8]>),
+    UnknownValue(Box<[u8]>),
 }
 
 /// Current state for a user key, calculated by scanning over the transaction log linearly
@@ -151,9 +158,9 @@ impl ShowHideCount {
 }
 
 /// Count shows since last manual hide
-pub fn read_log(file: &File) -> Result<HashMap<String, ShowHideCount>, Error> {
-    let line_reader = BufReader::new(file).lines();
-    let mut map: HashMap<String, ShowHideCount> = HashMap::new();
+pub fn read_log(file: &File) -> Result<HashMap<Box<[u8]>, ShowHideCount>, Error> {
+    let line_reader = BufReader::new(file).byte_lines();
+    let mut map: HashMap<Box<[u8]>, ShowHideCount> = HashMap::new();
     for line in line_reader {
         let line = line.map_err(Error::Io)?;
         let transaction = Transaction::parse(&line).map_err(Error::TransactionParse)?;
@@ -202,7 +209,7 @@ pub fn read_log(file: &File) -> Result<HashMap<String, ShowHideCount>, Error> {
 pub fn write_log(file: &File, transaction_log: Vec<Transaction>) -> Result<(), Error> {
     let mut writer = BufWriter::new(file);
     for transaction in transaction_log {
-        write!(writer, "{}", transaction.serialize()).map_err(Error::Io)?;
+        transaction.serialize(&mut writer).map_err(Error::Io)?;
     }
     writer.flush().map_err(Error::Io)?;
     Ok(())
