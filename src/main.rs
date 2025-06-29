@@ -182,11 +182,6 @@ impl Hooligan {
                 let mut removed: u32 = 0; // track removed lines
                 let mut retained: u32 = 0; // track retained lines that we would have normally removed, if not for the threshold
                 let mut pending_transactions: Vec<Transaction> = Vec::new(); // track difference between previous data and current data
-
-                let vrcset_lock_file = File::open(vrcset_path.as_path()).map_err(Error::Io)?;
-                let mut vrcset_lock = fd_lock::RwLock::new(vrcset_lock_file);
-                let vrcset_lock_guard = vrcset_lock.write().map_err(Error::Io)?;
-
                 let lines_to_remove = {
                     let vrcset_file = OpenOptions::new()
                         .read(true)
@@ -298,9 +293,6 @@ impl Hooligan {
                         writeln!(self.log, "added {shown} shown user entries to {vrcset_filename}");
                     }
                 }
-
-                // we're done writing to the vrcset file now, so drop the lock guard
-                drop(vrcset_lock_guard);
 
                 // persist changes to transaction log
                 writeln!(self.log, "about to record {} transactions", pending_transactions.len());
