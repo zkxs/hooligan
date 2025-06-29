@@ -62,8 +62,8 @@ impl Line {
         // write key
         written += writer.write(&self.key)?;
 
-        // pad with space out to 64
-        let spaces = 64 - written;
+        // pad with space out to column 64. Always use a minimum of 1 space.
+        let spaces = 64usize.saturating_sub(written).max(1);
         written += writer.write(&PADDING[..spaces])?;
 
         // write value
@@ -150,6 +150,7 @@ pub enum ParseErrorType {
 mod tests {
     use super::*;
 
+    /// Test a normal line with a hidden user
     #[test]
     fn test_line_hide() {
         let actual = Line::parse(b"usr_6b683acd-31a6-495d-aa46-a73c1349f462                        004").unwrap();
@@ -165,6 +166,7 @@ mod tests {
         assert_eq!(buf, expected);
     }
 
+    /// Test a normal line with a shown user
     #[test]
     fn test_line_show() {
         let actual = Line::parse(b"usr_6b683acd-31a6-495d-aa46-a73c1349f462                        005").unwrap();
@@ -180,6 +182,63 @@ mod tests {
         assert_eq!(buf, expected);
     }
 
+    /// Test an abnormally long line with 77 char key. It should get 1 space of padding.
+    #[test]
+    fn test_abnormally_long_line_1() {
+        // 77 char long key
+        let actual =
+            Line::parse(b"usr_6b683acd-31a6-495d-aa46-a73c1349f462-6b683acd-31a6-495d-aa46-a73c1349f462 005").unwrap();
+        let expected = Line {
+            key: b"usr_6b683acd-31a6-495d-aa46-a73c1349f462-6b683acd-31a6-495d-aa46-a73c1349f462"
+                .to_vec()
+                .into_boxed_slice(),
+            value: Value::Show,
+        };
+        assert_eq!(actual, expected);
+
+        let mut buf = Vec::new();
+        actual.serialize(&mut buf).unwrap();
+        let expected = b"usr_6b683acd-31a6-495d-aa46-a73c1349f462-6b683acd-31a6-495d-aa46-a73c1349f462 005\r\n";
+        assert_eq!(buf, expected);
+    }
+
+    /// Test an abnormally long line with 64 char key. It should get 1 space of padding.
+    #[test]
+    fn test_abnormally_long_line_2() {
+        let actual = Line::parse(b"usr_6b683acd-31a6-495d-aa46-a73c1349f462-6b683acd-31a6-495d-aa46 005").unwrap();
+        let expected = Line {
+            key: b"usr_6b683acd-31a6-495d-aa46-a73c1349f462-6b683acd-31a6-495d-aa46"
+                .to_vec()
+                .into_boxed_slice(),
+            value: Value::Show,
+        };
+        assert_eq!(actual, expected);
+
+        let mut buf = Vec::new();
+        actual.serialize(&mut buf).unwrap();
+        let expected = b"usr_6b683acd-31a6-495d-aa46-a73c1349f462-6b683acd-31a6-495d-aa46 005\r\n";
+        assert_eq!(buf, expected);
+    }
+
+    /// Test an abnormally long line with 63 char key. It should get 1 space of padding.
+    #[test]
+    fn test_abnormally_long_line_3() {
+        let actual = Line::parse(b"usr_6b683acd-31a6-495d-aa46-a73c1349f462-6b683acd-31a6-495d-aa4 005").unwrap();
+        let expected = Line {
+            key: b"usr_6b683acd-31a6-495d-aa46-a73c1349f462-6b683acd-31a6-495d-aa4"
+                .to_vec()
+                .into_boxed_slice(),
+            value: Value::Show,
+        };
+        assert_eq!(actual, expected);
+
+        let mut buf = Vec::new();
+        actual.serialize(&mut buf).unwrap();
+        let expected = b"usr_6b683acd-31a6-495d-aa46-a73c1349f462-6b683acd-31a6-495d-aa4 005\r\n";
+        assert_eq!(buf, expected);
+    }
+
+    /// Test a line with an unusual key. These are real IDs that can occur in-game that don't match the modern 40-char UUID pattern.
     #[test]
     fn test_line_weird() {
         let actual = Line::parse(b"2ZaOGztkpc                                                      005").unwrap();
@@ -195,6 +254,7 @@ mod tests {
         assert_eq!(buf, expected);
     }
 
+    /// Test a line with an undocumented value
     #[test]
     fn test_line_unknown_value() {
         let actual = Line::parse(b"2ZaOGztkpc                                                      009").unwrap_err();
@@ -208,6 +268,7 @@ mod tests {
         assert_eq!(buf, expected);
     }
 
+    /// Test a malformed line with no second field
     #[test]
     fn test_line_bad_split_not_enough() {
         let actual = Line::parse(b"2ZaOGztkpc").unwrap_err();
@@ -220,6 +281,7 @@ mod tests {
         assert_eq!(buf, expected);
     }
 
+    /// Test a malformed line with a third field
     #[test]
     fn test_line_bad_split_too_many() {
         let actual =
