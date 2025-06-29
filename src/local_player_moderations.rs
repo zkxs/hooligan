@@ -30,17 +30,25 @@ impl Line {
     pub fn parse(line: &[u8]) -> Result<Self, ParseError> {
         let first_space = line.find_byte(b' ');
         if let Some(first_space) = first_space {
+            // UNWRAP: if a space was found from a left scan, then a space must also be found from a right scan
             let last_space = line.rfind_byte(b' ').unwrap();
-            let key = &line[..first_space];
-            let value = &line[last_space + 1..];
-            if value.is_empty() {
-                // either the value was missing or there was some trailing space
-                Err(ParseError::bad_split(line))
+            let padding = &line[first_space..=last_space];
+            let contiguous_space = padding.iter().all(|char| *char == b' ');
+            if contiguous_space {
+                let key = &line[..first_space];
+                let value = &line[last_space + 1..];
+                if value.is_empty() {
+                    // either the value was missing or there was some trailing space
+                    Err(ParseError::bad_split(line))
+                } else {
+                    // all seems well
+                    let value: Value = Value::parse(value).map_err(|_| ParseError::unknown_value(line))?;
+                    let key = key.to_owned().into_boxed_slice();
+                    Ok(Self { key, value })
+                }
             } else {
-                // all seems well
-                let value: Value = Value::parse(value).map_err(|_| ParseError::unknown_value(line))?;
-                let key = key.to_owned().into_boxed_slice();
-                Ok(Self { key, value })
+                // the padding region was not contiguous. In other words, there were more than two space-delimited fields.
+                Err(ParseError::bad_split(line))
             }
         } else {
             // there was no space present
@@ -60,6 +68,9 @@ impl Line {
 
         // write value
         written += writer.write(self.value.serialize())?;
+
+        // write newline
+        written += writer.write(b"\r\n")?;
 
         Ok(written)
     }
@@ -147,6 +158,11 @@ mod tests {
             value: Value::Hide,
         };
         assert_eq!(actual, expected);
+
+        let mut buf = Vec::new();
+        actual.serialize(&mut buf).unwrap();
+        let expected = b"usr_6b683acd-31a6-495d-aa46-a73c1349f462                        004\r\n";
+        assert_eq!(buf, expected);
     }
 
     #[test]
@@ -157,6 +173,11 @@ mod tests {
             value: Value::Show,
         };
         assert_eq!(actual, expected);
+
+        let mut buf = Vec::new();
+        actual.serialize(&mut buf).unwrap();
+        let expected = b"usr_6b683acd-31a6-495d-aa46-a73c1349f462                        005\r\n";
+        assert_eq!(buf, expected);
     }
 
     #[test]
@@ -167,6 +188,11 @@ mod tests {
             value: Value::Show,
         };
         assert_eq!(actual, expected);
+
+        let mut buf = Vec::new();
+        actual.serialize(&mut buf).unwrap();
+        let expected = b"2ZaOGztkpc                                                      005\r\n";
+        assert_eq!(buf, expected);
     }
 
     #[test]
@@ -175,6 +201,11 @@ mod tests {
         let expected =
             ParseError::unknown_value(b"2ZaOGztkpc                                                      009");
         assert_eq!(actual, expected);
+
+        let mut buf = Vec::new();
+        actual.serialize(&mut buf).unwrap();
+        let expected = b"2ZaOGztkpc                                                      009\r\n";
+        assert_eq!(buf, expected);
     }
 
     #[test]
@@ -182,6 +213,11 @@ mod tests {
         let actual = Line::parse(b"2ZaOGztkpc").unwrap_err();
         let expected = ParseError::bad_split(b"2ZaOGztkpc");
         assert_eq!(actual, expected);
+
+        let mut buf = Vec::new();
+        actual.serialize(&mut buf).unwrap();
+        let expected = b"2ZaOGztkpc\r\n";
+        assert_eq!(buf, expected);
     }
 
     #[test]
@@ -191,5 +227,10 @@ mod tests {
         let expected =
             ParseError::bad_split(b"2ZaOGztkpc                                                      foo bar");
         assert_eq!(actual, expected);
+
+        let mut buf = Vec::new();
+        actual.serialize(&mut buf).unwrap();
+        let expected = b"2ZaOGztkpc                                                      foo bar\r\n";
+        assert_eq!(buf, expected);
     }
 }
