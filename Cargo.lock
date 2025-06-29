@@ -92,7 +92,7 @@ dependencies = [
 
 [[package]]
 name = "hooligan"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "bstr",
  "directories",
