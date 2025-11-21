@@ -91,7 +91,7 @@ ignore = [
 allow = [
     # Bog standard stuff
     "Apache-2.0",
-    "GPL-3.0",
+    "GPL-3.0-only",
     "MIT",
     # Weirder stuff
     "MPL-2.0", # OSI and FSF approved. Needed by option-ext
