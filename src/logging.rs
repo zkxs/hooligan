@@ -65,41 +65,41 @@ fn get_log_file(project_dirs: &ProjectDirs) -> io::Result<PathBuf> {
     let mut newest_log_file: Option<LogFile> = None;
     for entry in dir_iter {
         let entry = entry?;
-        if entry.file_type()?.is_file() {
-            if let Some(filename) = entry.file_name().to_str() {
-                if filename.starts_with("hooligan.") && filename.ends_with(".log") {
-                    let split: Vec<&str> = filename.split('.').collect();
-                    if split.len() == 3 {
-                        let index = split[1];
-                        let index: Option<u32> = index.parse().ok();
-                        if let Some(index) = index {
-                            if let Some(maybe_oldest) = &oldest_log_file {
-                                if index < maybe_oldest.index {
-                                    oldest_log_file = Some(LogFile {
-                                        index,
-                                        path: entry.path(),
-                                    })
-                                }
-                            } else {
-                                oldest_log_file = Some(LogFile {
-                                    index,
-                                    path: entry.path(),
-                                })
-                            }
-                            if let Some(maybe_newest) = &newest_log_file {
-                                if index > maybe_newest.index {
-                                    newest_log_file = Some(LogFile {
-                                        index,
-                                        path: entry.path(),
-                                    });
-                                }
-                            } else {
-                                newest_log_file = Some(LogFile {
-                                    index,
-                                    path: entry.path(),
-                                });
-                            }
+        if entry.file_type()?.is_file()
+            && let Some(filename) = entry.file_name().to_str()
+            && filename.starts_with("hooligan.")
+            && filename.ends_with(".log")
+        {
+            let split: Vec<&str> = filename.split('.').collect();
+            if split.len() == 3 {
+                let index = split[1];
+                let index: Option<u32> = index.parse().ok();
+                if let Some(index) = index {
+                    if let Some(maybe_oldest) = &oldest_log_file {
+                        if index < maybe_oldest.index {
+                            oldest_log_file = Some(LogFile {
+                                index,
+                                path: entry.path(),
+                            })
                         }
+                    } else {
+                        oldest_log_file = Some(LogFile {
+                            index,
+                            path: entry.path(),
+                        })
+                    }
+                    if let Some(maybe_newest) = &newest_log_file {
+                        if index > maybe_newest.index {
+                            newest_log_file = Some(LogFile {
+                                index,
+                                path: entry.path(),
+                            });
+                        }
+                    } else {
+                        newest_log_file = Some(LogFile {
+                            index,
+                            path: entry.path(),
+                        });
                     }
                 }
             }
@@ -118,10 +118,10 @@ fn get_log_file(project_dirs: &ProjectDirs) -> io::Result<PathBuf> {
         Ok(newest_log_file.unwrap().path)
     } else {
         // handle deleting the oldest log file if we are at the max log file limit
-        if let (Some(oldest_log_file), Some(newest_log_file)) = (oldest_log_file, &newest_log_file) {
-            if newest_log_file.index - oldest_log_file.index > MAX_LOG_INDEX_DIFFERENCE {
-                fs::remove_file(oldest_log_file.path)?;
-            }
+        if let (Some(oldest_log_file), Some(newest_log_file)) = (oldest_log_file, &newest_log_file)
+            && newest_log_file.index - oldest_log_file.index > MAX_LOG_INDEX_DIFFERENCE
+        {
+            fs::remove_file(oldest_log_file.path)?;
         }
 
         // create the new log file
