@@ -4,14 +4,13 @@
 
 //! Logging-related utilities
 
-use std::fmt::{Display, Formatter};
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
-use std::time::SystemTime;
 use std::{fmt, fs, io};
 
 use directories::ProjectDirs;
+use jiff::Timestamp;
 
 /// Maximum number of log files to retain, including the latest.
 const MAX_LOG_FILES: u32 = 3;
@@ -32,7 +31,7 @@ pub struct LogWriter {
 impl LogWriter {
     /// evil hack to write timestamps in logs
     pub fn write_fmt(&mut self, args: fmt::Arguments<'_>) {
-        write!(self.write, "{CurrentTime}: ").expect("failed to write log timestamp");
+        write!(self.write, "{}: ", Timestamp::now()).expect("failed to write log timestamp");
         self.write.write_fmt(args).expect("failed to write log arguments");
     }
 
@@ -49,6 +48,11 @@ pub fn get_logger(project_dirs: &ProjectDirs) -> io::Result<LogWriter> {
         .open(get_log_file(project_dirs)?)?;
     let buf_writer = BufWriter::new(file);
     Ok(LogWriter { write: buf_writer })
+}
+
+struct LogFile {
+    index: u32,
+    path: PathBuf,
 }
 
 /// Get the log file
@@ -137,21 +141,4 @@ fn create_log_dir_path(project_dirs: &ProjectDirs) -> io::Result<PathBuf> {
 /// Get path of logging directory
 fn get_log_dir(project_dirs: &ProjectDirs) -> PathBuf {
     project_dirs.data_local_dir().join("logs")
-}
-
-/// Handles displaying the current time in a minimally expensive way
-struct CurrentTime;
-
-impl Display for CurrentTime {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match SystemTime::UNIX_EPOCH.elapsed() {
-            Ok(current_time) => write!(f, "{}", current_time.as_secs()),
-            Err(e) => write!(f, "-{}", e.duration().as_secs()),
-        }
-    }
-}
-
-struct LogFile {
-    index: u32,
-    path: PathBuf,
 }
