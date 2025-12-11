@@ -31,7 +31,9 @@ pub struct LogWriter {
 impl LogWriter {
     /// evil hack to write timestamps in logs
     pub fn write_fmt(&mut self, args: fmt::Arguments<'_>) {
-        write!(self.write, "{}: ", Timestamp::now()).expect("failed to write log timestamp");
+        // timestamps typically look like "2025-12-10T06:59:49.9042015Z",
+        // but sometimes the decimal part will have trailing zeros truncated, so I pad the timestamp to 28 chars
+        write!(self.write, "{:28}: ", Timestamp::now()).expect("failed to write log timestamp");
         self.write.write_fmt(args).expect("failed to write log arguments");
     }
 
